@@ -1,0 +1,28 @@
+# Base Kustomization - Common manifests for all environments
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: parsehub
+
+# Resources to include
+# NOTE: secrets.yaml is intentionally excluded — secrets are managed out-of-band
+# via the CI/CD pipeline (GitHub Actions secrets → kubectl create secret)
+# or manually via infrastructure/kubernetes/scripts/setup-secrets.sh.
+# Never let kustomize overwrite live secrets with placeholder values.
+resources:
+  - namespace.yaml
+  - configmaps.yaml
+  - backend-deployment.yaml
+  - backend-service.yaml
+  - frontend-deployment.yaml
+  - frontend-service.yaml
+  - ingress.yaml
+  - hpa.yaml
+
+# Common labels applied to all resources
+commonLabels:
+  project: parsehub
+  managed-by: kustomize
+
+commonAnnotations:
+  deployment-date: "2026-03-12"

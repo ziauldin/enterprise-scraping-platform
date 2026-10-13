@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: frontend-config
+  namespace: parsehub
+data:
+  NODE_ENV: "production"
+  # Browser-side API calls go to localhost (port-forwarded)
+  NEXT_PUBLIC_API_URL: "http://localhost:5000"

@@ -1,0 +1,32 @@
+import { NextRequest, NextResponse } from 'next/server';
+
+const BACKEND_URL = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_BACKEND_URL || 'http://backend-svc:5000';
+const BACKEND_API_KEY = process.env.BACKEND_API_KEY ?? '';
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const projectToken = body.token || body.project_token;
+    if (!projectToken) {
+      return NextResponse.json({ error: 'Project token is required' }, { status: 400 });
+    }
+
+    const response = await fetch(`${BACKEND_URL}/api/projects/${projectToken}/run`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${BACKEND_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({}),
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      return NextResponse.json({ error: data.error || 'Failed to run project' }, { status: response.status });
+    }
+
+    return NextResponse.json(data);
+  } catch (error) {
+    return NextResponse.json({ error: 'Failed to run project', details: String(error) }, { status: 500 });
+  }
+}

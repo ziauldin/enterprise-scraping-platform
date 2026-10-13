@@ -1,0 +1,23 @@
+---
+# Backend Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-config
+  namespace: parsehub
+data:
+  FLASK_ENV: "production"
+  LOG_LEVEL: "info"
+  # Overridden per-environment in overlays/*/configmap-patch.yaml
+  ALLOWED_ORIGINS: "http://localhost:3000"
+
+---
+# Frontend Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: frontend-config
+  namespace: parsehub
+data:
+  NODE_ENV: "production"
+  # NEXT_PUBLIC_API_URL will be set per environment in overlays

@@ -1,0 +1,223 @@
+---
+# Snowflake Credentials Secret
+apiVersion: v1
+kind: Secret
+metadata:
+  name: snowflake-credentials
+  namespace: default
+type: Opaque
+stringData:
+  snowflake-account: "your-snowflake-account"
+  snowflake-user: "your-snowflake-user"
+  snowflake-password: "your-snowflake-password"
+  snowflake-warehouse: "PARSEHUB_DB"
+  snowflake-database: "PARSEHUB_DB"
+  snowflake-schema: "PARSEHUB_DB"
+
+---
+# Backend ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: parsehub-backend-config
+  namespace: default
+data:
+  FLASK_ENV: "production"
+  ALLOWED_ORIGINS: "https://your-domain.com"
+  LOG_LEVEL: "info"
+
+---
+# Backend Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: parsehub-backend
+  namespace: default
+  labels:
+    app: parsehub-backend
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: parsehub-backend
+  template:
+    metadata:
+      labels:
+        app: parsehub-backend
+    spec:
+      # Security context
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      
+      containers:
+      - name: backend
+        image: your-registry/parsehub-backend:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 5000
+          name: http
+        
+        # Environment from Secrets
+        env:
+        - name: SNOWFLAKE_ACCOUNT
+          valueFrom:
+            secretKeyRef:
+              name: snowflake-credentials
+              key: snowflake-account
+        - name: SNOWFLAKE_USER
+          valueFrom:
+            secretKeyRef:
+              name: snowflake-credentials
+              key: snowflake-user
+        - name: SNOWFLAKE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: snowflake-credentials
+              key: snowflake-password
+        - name: SNOWFLAKE_WAREHOUSE
+          valueFrom:
+            secretKeyRef:
+              name: snowflake-credentials
+              key: snowflake-warehouse
+        - name: SNOWFLAKE_DATABASE
+          valueFrom:
+            secretKeyRef:
+              name: snowflake-credentials
+              key: snowflake-database
+        - name: SNOWFLAKE_SCHEMA
+          valueFrom:
+            secretKeyRef:
+              name: snowflake-credentials
+              key: snowflake-schema
+        
+        # Environment from ConfigMap
+        envFrom:
+        - configMapRef:
+            name: parsehub-backend-config
+        
+        # Resource limits
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        
+        # Health checks
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 5000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 5000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        
+        # Graceful shutdown
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/sh", "-c", "sleep 15"]
+
+---
+# Backend Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: parsehub-backend-svc
+  namespace: default
+  labels:
+    app: parsehub-backend
+spec:
+  type: ClusterIP
+  ports:
+  - port: 5000
+    targetPort: 5000
+    protocol: TCP
+    name: http
+  selector:
+    app: parsehub-backend
+
+---
+# Horizontal Pod Autoscaler
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: parsehub-backend-hpa
+  namespace: default
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: parsehub-backend
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+
+---
+# Network Policy (Optional - Restrict traffic)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: parsehub-backend-netpol
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      app: parsehub-backend
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: default
+    - podSelector:
+        matchLabels:
+          app: parsehub-frontend
+    ports:
+    - protocol: TCP
+      port: 5000
+  egress:
+  # Allow DNS
+  - to:
+    - namespaceSelector: {}
+    ports:
+    - protocol: UDP
+      port: 53
+  # Allow HTTPS to Snowflake
+  - to:
+    - namespaceSelector: {}
+    ports:
+    - protocol: TCP
+      port: 443

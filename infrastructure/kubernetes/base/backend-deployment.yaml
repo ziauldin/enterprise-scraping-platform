@@ -1,0 +1,135 @@
+---
+# Backend Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: parsehub
+  labels:
+    app: backend
+    version: v1
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      
+      containers:
+      - name: backend
+        image: parsehubacr2026.azurecr.io/parsehub-backend:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 5000
+          name: http
+        
+        # Secret refs — same across all environments.
+        # Non-secret config (ALLOWED_ORIGINS etc.) comes via envFrom → backend-config ConfigMap.
+        env:
+        - name: PARSEHUB_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: parsehub-secrets
+              key: PARSEHUB_API_KEY
+        - name: BACKEND_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: parsehub-secrets
+              key: BACKEND_API_KEY
+        - name: AUTOMATION_INTERNAL_KEY
+          valueFrom:
+            secretKeyRef:
+              name: parsehub-secrets
+              key: AUTOMATION_INTERNAL_KEY
+        - name: PARSEHUB_WEBHOOK_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: parsehub-secrets
+              key: PARSEHUB_WEBHOOK_SECRET
+
+        # Snowflake Secrets
+        - name: SNOWFLAKE_ACCOUNT
+          valueFrom:
+            secretKeyRef:
+              name: parsehub-secrets
+              key: SNOWFLAKE_ACCOUNT
+        - name: SNOWFLAKE_USER
+          valueFrom:
+            secretKeyRef:
+              name: parsehub-secrets
+              key: SNOWFLAKE_USER
+        - name: SNOWFLAKE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: parsehub-secrets
+              key: SNOWFLAKE_PASSWORD
+        - name: SNOWFLAKE_WAREHOUSE
+          valueFrom:
+            secretKeyRef:
+              name: parsehub-secrets
+              key: SNOWFLAKE_WAREHOUSE
+        - name: SNOWFLAKE_DATABASE
+          valueFrom:
+            secretKeyRef:
+              name: parsehub-secrets
+              key: SNOWFLAKE_DATABASE
+        - name: SNOWFLAKE_SCHEMA
+          valueFrom:
+            secretKeyRef:
+              name: parsehub-secrets
+              key: SNOWFLAKE_SCHEMA
+        
+        # Load all ConfigMap vars
+        envFrom:
+        - configMapRef:
+            name: backend-config
+        
+        # Resource requests and limits (fits Standard_DC2s_v3 node)
+        resources:
+          requests:
+            cpu: "500m"
+            memory: "1Gi"
+          limits:
+            cpu: "2"
+            memory: "2Gi"
+        
+        # Liveness probe - restart if unhealthy
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 5000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        
+        # Readiness probe - ready to receive traffic
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 5000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        
+        # Graceful shutdown
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/sh", "-c", "sleep 15"]
+        
+      

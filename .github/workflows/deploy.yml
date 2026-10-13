@@ -1,0 +1,147 @@
+name: Deploy to Azure AKS
+
+on:
+  push:
+    branches:
+      - main
+
+# Prevent concurrent deployments — if a new push comes in while
+# one deploy is running, cancel the in-progress run first.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: true
+
+env:
+  ACR_REGISTRY: parsehubacr2026.azurecr.io
+  BACKEND_IMAGE: parsehubacr2026.azurecr.io/parsehub-backend
+  FRONTEND_IMAGE: parsehubacr2026.azurecr.io/parsehub-frontend
+  AKS_CLUSTER: parsehub-cluster
+  AKS_RG: parsehub-rg
+  NAMESPACE: parsehub
+
+jobs:
+  deploy:
+    name: Build, Push, Deploy
+    runs-on: ubuntu-latest
+    steps:
+
+      # ── 1. Checkout code ──────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4.2.2
+
+      # ── 2. Log in to Azure ────────────────────────────────────────
+      - name: Azure Login
+        uses: azure/login@v2.3.0
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      # ── 3. Log in to ACR ──────────────────────────────────────────
+      - name: Log in to Azure Container Registry
+        run: az acr login --name ${{ secrets.ACR_NAME }}
+
+      # ── 4. Build and push backend image ───────────────────────────
+      - name: Build backend image
+        run: |
+          docker build \
+            -t ${{ env.BACKEND_IMAGE }}:${{ github.sha }} \
+            -t ${{ env.BACKEND_IMAGE }}:latest \
+            -f infrastructure/docker/Dockerfile-backend \
+            .
+
+      - name: Push backend image
+        run: |
+          docker push ${{ env.BACKEND_IMAGE }}:${{ github.sha }}
+          docker push ${{ env.BACKEND_IMAGE }}:latest
+
+      # ── 5. Build and push frontend image ──────────────────────────
+      - name: Build frontend image
+        run: |
+          docker build \
+            -t ${{ env.FRONTEND_IMAGE }}:${{ github.sha }} \
+            -t ${{ env.FRONTEND_IMAGE }}:latest \
+            -f infrastructure/docker/Dockerfile-frontend \
+            .
+
+      - name: Push frontend image
+        run: |
+          docker push ${{ env.FRONTEND_IMAGE }}:${{ github.sha }}
+          docker push ${{ env.FRONTEND_IMAGE }}:latest
+
+      # ── 6. Get AKS credentials ────────────────────────────────────
+      - name: Get AKS credentials
+        run: |
+          az aks get-credentials \
+            --resource-group ${{ env.AKS_RG }} \
+            --name ${{ env.AKS_CLUSTER }} \
+            --overwrite-existing
+
+      # ── 7. Apply application secrets to K8s ──────────────────────
+      # Keys are stored in GitHub repo Settings → Secrets and variables → Actions.
+      # They are never written to disk or printed in logs.
+      - name: Apply application secrets to K8s
+        run: |
+          kubectl create secret generic parsehub-secrets \
+            --from-literal=PARSEHUB_API_KEY="${{ secrets.PARSEHUB_API_KEY }}" \
+            --from-literal=BACKEND_API_KEY="${{ secrets.BACKEND_API_KEY }}" \
+            --from-literal=AUTOMATION_INTERNAL_KEY="${{ secrets.AUTOMATION_INTERNAL_KEY }}" \
+            --from-literal=PARSEHUB_WEBHOOK_SECRET="${{ secrets.PARSEHUB_WEBHOOK_SECRET }}" \
+            --from-literal=SNOWFLAKE_ACCOUNT="${{ secrets.SNOWFLAKE_ACCOUNT }}" \
+            --from-literal=SNOWFLAKE_USER="${{ secrets.SNOWFLAKE_USER }}" \
+            --from-literal=SNOWFLAKE_PASSWORD="${{ secrets.SNOWFLAKE_PASSWORD }}" \
+            --from-literal=SNOWFLAKE_WAREHOUSE="${{ secrets.SNOWFLAKE_WAREHOUSE }}" \
+            --from-literal=SNOWFLAKE_DATABASE="${{ secrets.SNOWFLAKE_DATABASE }}" \
+            --from-literal=SNOWFLAKE_SCHEMA="${{ secrets.SNOWFLAKE_SCHEMA }}" \
+            -n ${{ env.NAMESPACE }} \
+            --dry-run=client \
+            -o yaml | kubectl apply -f -
+
+      # ── 8. Apply K8s manifests ────────────────────────────────────
+      - name: Apply K8s manifests
+        run: |
+          kubectl apply -k infrastructure/kubernetes/overlays/azure/ \
+            --server-side \
+            --force-conflicts
+
+      # ── 9. Pin images to exact commit sha (zero-downtime rollout) ─
+      # kubectl set image updates the image in the live deployment spec
+      # and triggers a rolling restart. Kubernetes brings up new pods,
+      # waits for readiness probe, then removes old ones.
+      - name: Deploy backend (rolling restart)
+        run: |
+          kubectl set image deployment/backend \
+            backend=${{ env.BACKEND_IMAGE }}:${{ github.sha }} \
+            -n ${{ env.NAMESPACE }}
+          kubectl rollout status deployment/backend \
+            -n ${{ env.NAMESPACE }} \
+            --timeout=300s
+
+      - name: Deploy frontend (rolling restart)
+        run: |
+          kubectl set image deployment/frontend \
+            frontend=${{ env.FRONTEND_IMAGE }}:${{ github.sha }} \
+            -n ${{ env.NAMESPACE }}
+          kubectl rollout status deployment/frontend \
+            -n ${{ env.NAMESPACE }} \
+            --timeout=300s
+
+      # ── 10. Verify pods are healthy ───────────────────────────────
+      - name: Verify pod health
+        run: |
+          echo "=== Pod status ==="
+          kubectl get pods -n ${{ env.NAMESPACE }}
+          echo ""
+          echo "=== Backend rollout ==="
+          kubectl rollout history deployment/backend -n ${{ env.NAMESPACE }}
+          echo ""
+          echo "=== Frontend rollout ==="
+          kubectl rollout history deployment/frontend -n ${{ env.NAMESPACE }}
+
+      # ── 10. Summary ───────────────────────────────────────────────
+      - name: Deployment summary
+        run: |
+          echo "✅ Deployment complete"
+          echo "   Commit:    ${{ github.sha }}"
+          echo "   Pushed by: ${{ github.actor }}"
+          echo "   Branch:    ${{ github.ref_name }}"
+          echo "   Backend:   ${{ env.BACKEND_IMAGE }}:${{ github.sha }}"
+          echo "   Frontend:  ${{ env.FRONTEND_IMAGE }}:${{ github.sha }}"

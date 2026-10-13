@@ -1,0 +1,30 @@
+# Production Overlay for AWS EKS / Cloud Deployment
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+bases:
+  - ../../base
+
+# Production image registry (replace with your actual registry)
+# Example: YOUR_AWS_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/parsehub
+images:
+  - name: parsehub-backend
+    newName: your-registry/parsehub-backend
+    newTag: latest
+  - name: parsehub-frontend
+    newName: your-registry/parsehub-frontend
+    newTag: latest
+
+# Production patches
+patchesStrategicMerge:
+  - backend-patch.yaml
+  - frontend-patch.yaml
+
+# Production replicas and resources
+commonLabels:
+  environment: production
+  tier: app
+
+commonAnnotations:
+  environment: "production"
+  deployment-date: "2026-03-12"

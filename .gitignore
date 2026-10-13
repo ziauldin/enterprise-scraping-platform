@@ -1,0 +1,67 @@
+
+# Environment variables — ignore real files, but keep .example templates in git
+.env
+.env.local
+.env.*.local
+backend/.env
+backend/.env.local
+backend/.env.*.local
+frontend/.env
+frontend/.env.local
+frontend/.env.*.local
+# Explicitly keep example templates
+!backend/.env.example
+!frontend/.env.example
+
+# Dependencies
+node_modules/
+venv/
+.venv/
+*.egg-info/
+__pycache__/
+
+# Build outputs
+.next/
+out/
+dist/
+build/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+*.bak
+
+# Cache
+.cache/
+.pytest_cache/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Temporary files
+*.tmp
+*.temp
+
+# Celery beat runtime files
+celerybeat-schedule
+
+# Local runtime / client data (never commit)
+active_runs.json
+session_urls.json
+final metadata file.csv
+*.xlsx

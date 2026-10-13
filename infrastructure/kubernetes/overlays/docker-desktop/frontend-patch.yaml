@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: parsehub
+spec:
+  replicas: 1
+  template:
+    spec:
+      containers:
+      - name: frontend
+        imagePullPolicy: Never
+        env:
+        # SSR calls from server-side go through the internal k8s service
+        - name: BACKEND_API_URL
+          value: "http://backend-svc:5000"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"

@@ -1,0 +1,36 @@
+{
+  "name": "parsehub-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "node --max-old-space-size=4096 ./node_modules/next/dist/bin/next dev",
+    "build": "node --max-old-space-size=4096 ./node_modules/next/dist/bin/next build",
+    "start": "node --max-old-space-size=4096 ./node_modules/next/dist/bin/next start"
+  },
+  "dependencies": {
+    "@formkit/auto-animate": "^0.9.0",
+    "@gsap/react": "^2.1.2",
+    "@react-spring/web": "^10.0.3",
+    "aos": "^2.3.4",
+    "axios": "^1.6",
+    "gsap": "^3.14.2",
+    "lottie-react": "^2.4.1",
+    "lucide-react": "^0.292",
+    "motion": "^12.38.0",
+    "next": "^16.2.1",
+    "react": "^18",
+    "react-dom": "^18",
+    "react-multi-select-component": "^4.3.4",
+    "recharts": "^2.10"
+  },
+  "devDependencies": {
+    "@types/aos": "^3.0.7",
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "autoprefixer": "^10",
+    "postcss": "^8",
+    "tailwindcss": "^3",
+    "typescript": "^5"
+  }
+}

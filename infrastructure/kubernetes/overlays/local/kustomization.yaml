@@ -1,0 +1,27 @@
+# Local Kind Cluster Overlay
+# For testing locally on Kind cluster with local images
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+bases:
+  - ../../base
+
+# For local testing, use local image names (no registry)
+images:
+  - name: parsehub-backend
+    newName: localhost:5000/parsehub-backend
+    newTag: latest
+  - name: parsehub-frontend
+    newName: localhost:5000/parsehub-frontend
+    newTag: latest
+
+# Patches for local environment
+patchesStrategicMerge:
+  - backend-patch.yaml
+  - frontend-patch.yaml
+
+commonLabels:
+  environment: local
+
+commonAnnotations:
+  environment: "local (Kind cluster)"

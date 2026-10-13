@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: parsehub
+spec:
+  replicas: 1
+  template:
+    spec:
+      containers:
+      - name: backend
+        imagePullPolicy: Never
+        env:
+        - name: ALLOWED_ORIGINS
+          value: "http://localhost:3000"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"

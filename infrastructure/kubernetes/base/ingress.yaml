@@ -1,0 +1,28 @@
+---
+# Ingress for routing external traffic
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: parsehub-ingress
+  namespace: parsehub
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - parsehub.example.com
+    secretName: parsehub-tls
+  rules:
+  # All traffic enters through the frontend (Next.js proxies backend calls internally)
+  - host: parsehub.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: frontend-svc
+            port:
+              number: 3000

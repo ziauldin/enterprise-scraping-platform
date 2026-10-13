@@ -1,0 +1,18 @@
+---
+# Frontend Service (ClusterIP - internal only)
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-svc
+  namespace: parsehub
+  labels:
+    app: frontend
+spec:
+  type: ClusterIP
+  ports:
+  - port: 3000
+    targetPort: 3000
+    protocol: TCP
+    name: http
+  selector:
+    app: frontend

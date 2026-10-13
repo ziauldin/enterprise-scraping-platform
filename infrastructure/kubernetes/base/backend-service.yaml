@@ -1,0 +1,18 @@
+---
+# Backend Service (ClusterIP - internal only)
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-svc
+  namespace: parsehub
+  labels:
+    app: backend
+spec:
+  type: ClusterIP
+  ports:
+  - port: 5000
+    targetPort: 5000
+    protocol: TCP
+    name: http
+  selector:
+    app: backend
